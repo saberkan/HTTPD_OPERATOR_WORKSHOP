@@ -1,0 +1,45 @@
+I - DEMO 2:
+# Deploy HTTPD without operator
+oc new-project test-httpd
+oc apply -f httpd_dc.yml
+oc apply -f httpd_svc.yml
+oc expose svc/httpd-24-rhel7
+
+# Clean
+oc delete namespace test-httpd
+
+# Write the operator
+operator-sdk new httpd-operator --api-version=httpd.saberkan.fr/v1 --kind=Httpd --type=ansible
+cp httpd_playbook.yml httpd-operator/playbook.yaml
+cp httpd_operator_watches.yml httpd-operator/watches.yaml
+cp httpd_role_tasks.yml httpd-operator/roles/httpd/tasks/main.yml
+cp httpd_dockerfile httpd-operator/build/Dockerfile
+cp httpd_operator_dc.yml httpd-operator/deploy/operator.yaml
+cp httpd_operator_role.yml httpd-operator/deploy/role.yaml
+cp httpd_operator_rolebindig.yml httpd-operator/deploy/role_binding.yaml
+cp httpd_operator_sa.yml httpd-operator/deploy/service_account.yaml
+
+# Build it
+oc new-project test-operators
+operator-sdk build quay.io/saberkan/httpd-operator:v1
+docker push quay.io/saberkan/httpd-operator:v1
+
+# Deploy it
+for item in $(ls deploy/*yaml); do oc apply -f $item; done
+oc create -f deploy/crds/httpd.saberkan.fr_httpds_crd.yaml
+cat <<EOF | oc create -f -
+apiVersion: httpd.saberkan.fr/v1
+kind: Httpd
+metadata:
+  name: example-httpd
+spec:
+  my_var_value: "IT WORKS WITH OPERATOR"
+  size: 1
+EOF
+# TODO : publish and share
+
+II - DEMO 3: Show CatalogSource, CSV, Subscription, Installplan
+https://github.com/operator-framework/operator-registry
+https://github.com/operator-framework/operator-lifecycle-manager
+https://access.redhat.com/solutions/4583231
+https://github.com/redhat-cop/operator-utils
